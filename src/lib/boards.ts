@@ -1,5 +1,5 @@
 // Deterministic puzzle builders shared by app + server (no DOM).
-import { FUMBUA_ANSWERS, LETTER_WEIGHTS, LEXICON } from '../data/words.js'
+import { FUMBUA_ANSWERS, FUMBUA_ERAS, LETTER_WEIGHTS, LEXICON } from '../data/words.js'
 import { Rng, rngFor, shuffle, weighted } from './rng.js'
 import { anagramBases, solveGrid, subWords } from './solver.js'
 
@@ -52,4 +52,8 @@ export function panguaBase(level: number) {
 }
 export const panguaTargets = (base: string) => subWords(base)
 
-export const fumbuaDailyAnswer = (dayIdx: number) => FUMBUA_ANSWERS[(dayIdx * 7919 + 13) % FUMBUA_ANSWERS.length]
+export function fumbuaDailyAnswer(dayIdx: number) {
+  const era = [...FUMBUA_ERAS].reverse().find(e => dayIdx >= e.fromDay)!
+  const n = Math.min(era.size, FUMBUA_ANSWERS.length)
+  return FUMBUA_ANSWERS[(dayIdx * 7919 + 13) % n]
+}
