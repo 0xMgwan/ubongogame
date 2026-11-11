@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ubongo Admin</title>
+<link rel="icon" href="/icon.svg" />
+<style>
+  :root { --bg: #0b0a1a; --card: #17143a; --line: #2b2660; --ink: #f4f1ff; --dim: #a39fc7; --gold: #ffcb47; --good: #16d99a; --bad: #ff4d6d; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { font-size: 26px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 28px 0 10px; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 16px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .kpi b { display: block; font-size: 26px; } .kpi span { color: var(--dim); font-size: 12px; }
+  .table { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+  table { width: 100%; border-collapse: collapse; min-width: 760px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; font-size: 12px; background: var(--card); }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 700; background: #2b2660; }
+  .in_review { background: var(--gold); color: #3b2500; } .live { background: var(--good); color: #04281c; } .rejected { background: var(--bad); }
+  button { font: inherit; border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; font-weight: 700; margin: 2px; }
+  .ok { background: var(--good); color: #04281c; } .no { background: var(--bad); color: #fff; } .ghost { background: #2b2660; color: var(--ink); }
+  .preview { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 10px; min-width: 220px; }
+  form { display: flex; gap: 8px; margin-top: 16px; } input { flex: 1; max-width: 320px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  .muted { color: var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <h1>🧠 Ubongo Admin</h1>
+  <div class="muted">Review ad campaigns, watch revenue and players.</div>
+  <form id="login"><input id="key" type="password" placeholder="ADMIN_KEY" autocomplete="current-password" /><button class="ok">Open</button></form>
+  <div id="app"></div>
+</main>
+<script>
+const $ = s => document.querySelector(s)
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+let KEY = sessionStorage.getItem('ubongo-admin') || ''
+const call = (path, opts = {}) => fetch('/api/admin' + path, { ...opts, headers: { 'content-type': 'application/json', 'x-admin-key': KEY } })
+  .then(async r => { const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j })
+const tzs = n => 'TZS ' + Number(n || 0).toLocaleString()
+const date = t => t ? new Date(t).toLocaleDateString() : '—'
+
+async function load() {
+  try {
+    const d = await call('/overview')
+    $('#login').style.display = 'none'
+    const rev = d.revenue.reduce((a, r) => a + r.tzs, 0)
+    $('#app').innerHTML = `
+      <div class="kpis">
+        <div class="kpi"><b>${d.players}</b><span>Players</span></div>
+        <div class="kpi"><b>${d.dau}</b><span>Active last 24h</span></div>
+        <div class="kpi"><b>${d.runsToday}</b><span>Games finished today</span></div>
+        <div class="kpi"><b>${d.pro}</b><span>Kifalme subscribers</span></div>
+        <div class="kpi"><b>${tzs(rev)}</b><span>Revenue (paid)</span></div>
+      </div>
+      <h2>Revenue by product</h2>
+      <div class="table"><table><tr><th>Product</th><th>Payments</th><th>Total</th></tr>
+        ${d.revenue.map(r => `<tr><td>${esc(r.product)}</td><td>${r.n}</td><td>${tzs(r.tzs)}</td></tr>`).join('') || '<tr><td colspan=3 class=muted>No paid payments yet</td></tr>'}
+      </table></div>
+      <h2>Ad campaigns</h2>
+      <div class="table"><table>
+        <tr><th>#</th><th>Ad</th><th>Slot · days</th><th>Price</th><th>Contact</th><th>Status</th><th>Stats</th><th></th></tr>
+        ${d.campaigns.map(c => `<tr>
+          <td>${c.id}</td>
+          <td><div class="preview" style="background:${esc(c.grad)}"><span style="font-size:22px">${esc(c.emoji)}</span><div><b>${esc(c.brand)}</b><div style="font-size:12px;opacity:.85">${esc(c.line)}</div>${c.link ? `<div style="font-size:11px;opacity:.7">${esc(c.link)}</div>` : ''}</div></div></td>
+          <td>${esc(c.slot)} · ${c.days}d</td><td>${tzs(c.price_tzs)}</td>
+          <td>${esc(c.contact)}<div class="muted" style="font-size:12px">by ${esc(c.player)}</div></td>
+          <td><span class="pill ${esc(c.status)}">${esc(c.status)}</span><div class="muted" style="font-size:12px">${c.status === 'live' ? 'until ' + date(c.ends_at) : esc(c.review_note || '')}</div></td>
+          <td>${c.impressions} views<br>${c.clicks} clicks</td>
+          <td>${c.status === 'in_review' ? `<button class="ok" data-a="approve" data-id="${c.id}">Approve</button><button class="no" data-a="reject" data-id="${c.id}">Reject</button>` : ''}
+              ${c.status === 'live' ? `<button class="ghost" data-a="end" data-id="${c.id}">End</button>` : ''}</td>
+        </tr>`).join('') || '<tr><td colspan=8 class=muted>No campaigns yet</td></tr>'}
+      </table></div>`
+  } catch (e) {
+    $('#login').style.display = 'flex'
+    if (KEY) $('#app').innerHTML = `<p class="muted">${esc(e.message)}</p>`
+  }
+}
+$('#login').onsubmit = e => { e.preventDefault(); KEY = $('#key').value; sessionStorage.setItem('ubongo-admin', KEY); load() }
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button[data-a]'); if (!b) return
+  let body = {}
+  if (b.dataset.a === 'reject') { const note = prompt('Reason (shown to the advertiser)?'); if (note === null) return; body = { note } }
+  await call(`/campaigns/${b.dataset.id}/${b.dataset.a}`, { method: 'POST', body: JSON.stringify(body) }).catch(err => alert(err.message))
+  load()
+})
+load()
+</script>
+</body>
+</html>

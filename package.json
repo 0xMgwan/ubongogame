@@ -1,0 +1,36 @@
+{
+  "name": "ubongo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite --port 5180",
+    "dev:api": "PORT=8790 tsx watch --env-file-if-exists=.env server/local.ts",
+    "build": "tsc -b && vite build",
+    "start": "NODE_ENV=production tsx --env-file-if-exists=.env server/local.ts",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.server.json"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "framer-motion": "^11.11.17",
+    "jsonwebtoken": "^9.0.2",
+    "postgres": "^3.4.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsx": "^4.19.2",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.12",
+    "@electric-sql/pglite-socket": "^0.2.15",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
