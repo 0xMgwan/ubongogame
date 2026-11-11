@@ -64,7 +64,7 @@ function Board({ run, onNext, onLeave }: { run: RunView; onNext: () => void; onL
       }
     } else { sfx.bad(); setMsg({ id: Date.now(), t: 'Si neno', ok: false }) }
   }
-  const { ref, path, handlers } = useTrace({ centers, radius: () => 34, canAdd: () => true, onAdd: p => sfx.chain(p.length), onEnd: submit })
+  const { ref, path, pointsFor } = useTrace({ item: '.wheel-l', radius: 0.55, canAdd: () => true, onAdd: p => sfx.chain(p.length), onEnd: submit })
   const cur = path.map(i => order[i]).join('')
 
   const reshuffle = () => { sfx.whoosh(); setPerm(o => { let x = shuffle(o); if (x.join() === o.join()) x = shuffle(o); return x }) }
@@ -83,7 +83,7 @@ function Board({ run, onNext, onLeave }: { run: RunView; onNext: () => void; onL
     submit([...open[0]].reduce<number[]>((acc, ch) => { const i = order.findIndex((c, j) => c === ch && !acc.includes(j)); return [...acc, i] }, []))
   }
 
-  const pts = path.map(i => centers()[i])
+  const pts = pointsFor(path)
 
   return (
     <>
@@ -122,18 +122,18 @@ function Board({ run, onNext, onLeave }: { run: RunView; onNext: () => void; onL
           </AnimatePresence>
         </div>
 
-        <div className="wheel" ref={ref} {...handlers}>
+        <div className="wheel" ref={ref}>
           <svg width={W} height={W} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
             {pts.length > 1 && <polyline points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#141414" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />}
           </svg>
           {perm.map((j, i) => ({ j, i })).sort((a, b) => a.j - b.j).map(({ j, i }) => {
             const c = centers()[i]
             return (
-              <motion.div key={base + j} className={`wheel-l ${path.includes(i) ? 'sel' : ''}`} initial={{ left: W / 2, top: W / 2, scale: 0 }}
+              <motion.div key={base + j} data-i={i} className={`wheel-l ${path.includes(i) ? 'sel' : ''}`} initial={{ left: W / 2, top: W / 2, scale: 0 }}
                 animate={{ left: c.x, top: c.y, scale: path.includes(i) ? .92 : 1 }} transition={spring}>{base[j]}</motion.div>
             )
           })}
-          <motion.button className="wheel-c" whileTap={{ rotate: 180, scale: .9 }} onClick={reshuffle} onPointerDown={e => e.stopPropagation()}><Icon name="shuffle" size={26} /></motion.button>
+          <motion.button className="wheel-c" whileTap={{ rotate: 180, scale: .9 }} onClick={reshuffle}><Icon name="shuffle" size={26} /></motion.button>
         </div>
         <SponsorStrip slot="pangua" />
       </div>

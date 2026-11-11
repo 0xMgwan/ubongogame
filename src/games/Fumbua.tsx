@@ -10,10 +10,10 @@ import { sfx } from '../lib/sound'
 import { Flap, GameHead, GameLoading, PowerBtn, Result, ResultSheet, SponsorStrip, baseResult } from '../components/ui'
 import { DuelCountdown, DuelState, DuelTimeBar, OppBar } from '../components/duel'
 import { Icon } from '../components/icons'
+import { KEY_ROWS as ROWS, PhoneKeyboard } from '../components/keys'
 
 type Mark = 'correct' | 'present' | 'absent'
 type Guess = { word: string; marks: Mark[] }
-const ROWS = ['ertyuiop', 'asdfghjkl', 'zcvbnm']
 const TITLES = ['Gwiji!', 'Hodari sana!', 'Safi kabisa!', 'Vizuri!', 'Umeweza!', 'Phew!']
 
 export default function Fumbua({ run: given, duel, onLeave }: { run?: RunView | null; duel?: DuelState; onLeave?: () => void }) {
@@ -120,14 +120,25 @@ function Board({ run: initial, initialResult, duel, onNext, onLeave }: { run: Ru
   return (
     <>
       <GameHead game="fumbua" sub={sub} onBack={onLeave}
-        right={duel ? undefined : <PowerBtn icon="bulb" count={s.inv.dokezo} onClick={hint} label="Dokezo" />} />
+        right={<div className="row" style={{ gap: 6 }}>
+          <PhoneKeyboard onKey={type} />
+          {!duel && <PowerBtn icon="bulb" count={s.inv.dokezo} onClick={hint} label="Dokezo" />}
+        </div>} />
       <div className="g-body">
         {duel && <><OppBar duel={duel} /><DuelTimeBar duel={duel} /></>}
         {!duel && (
-          <div className="row" style={{ justifyContent: 'center', gap: 6, minHeight: 28 }}>
-            {[0, 1, 2, 3, 4].map(i => (
-              <div key={i} style={{ width: 24, height: 24, borderRadius: 6, display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 12, textTransform: 'uppercase', background: hints[i] ? 'var(--green)' : 'transparent', color: '#fff', border: hints[i] ? '2px solid var(--ink)' : '2px dashed var(--soft)' }}>{hints[i] ?? ''}</div>
-            ))}
+          <div className="fb-info">
+            <span className="chip ink">Jaribio {Math.min(guesses.length + (over ? 0 : 1), 6)}/6</span>
+            {Object.keys(hints).length > 0 ? (
+              <span className="row" style={{ gap: 3 }} title="Herufi za dokezo">
+                <Icon name="bulb" size={16} />
+                {[0, 1, 2, 3, 4].map(i => <i key={i} className={`fb-hint ${hints[i] ? 'on' : ''}`}>{hints[i] ?? ''}</i>)}
+              </span>
+            ) : (
+              <span className="fb-legend">
+                <span><i className="correct" />Sahihi</span><span><i className="present" />Ipo, si hapa</span><span><i className="absent" />Haipo</span>
+              </span>
+            )}
           </div>
         )}
         <div className="fb-board">

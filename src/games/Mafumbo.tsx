@@ -8,8 +8,8 @@ import { RunView, finishRun, startRun, useRunItem } from '../lib/runs'
 import { sfx } from '../lib/sound'
 import { GameHead, GameLoading, PowerBtn, Result, ResultSheet, SponsorStrip, baseResult } from '../components/ui'
 import { Icon } from '../components/icons'
+import { KEY_ROWS as ROWS, PhoneKeyboard } from '../components/keys'
 
-const ROWS = ['ertyuiop', 'asdfghjkl', 'zcvbnm']
 const K = (r: number, c: number) => `${r},${c}`
 
 function cellsOf(w: Placed) {
@@ -143,6 +143,7 @@ function Board({ run, onNext, onLeave }: { run: RunView; onNext: () => void; onL
 
   useEffect(() => {
     const h = (ev: KeyboardEvent) => {
+      if ((ev.target as HTMLElement)?.tagName === 'INPUT') return
       if (ev.key === 'Backspace') type('del')
       else if (/^[a-z]$/i.test(ev.key)) type(ev.key.toLowerCase())
       else if (ev.key === 'Tab' || ev.key === 'Enter') { ev.preventDefault(); goWord((active + 1) % cw.words.length) }
@@ -182,6 +183,7 @@ function Board({ run, onNext, onLeave }: { run: RunView; onNext: () => void; onL
       <GameHead game="mafumbo" onBack={onLeave} sub={`${solvedWords.size}/${cw.words.length} maneno · ⏱ ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`}
         right={<div className="row" style={{ gap: 6 }}>
           <PowerBtn icon="check" onClick={check} label="Kagua" />
+          <PhoneKeyboard onKey={k => (k === 'enter' ? goWord((active + 1) % cw.words.length) : type(k))} />
           <PowerBtn icon="bulb" count={s.inv.dokezo} onClick={revealLetter} label="Fichua herufi" />
           <PowerBtn icon="bomb" count={s.inv.bomu} onClick={revealWord} label="Fichua neno" />
         </div>} />

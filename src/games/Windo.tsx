@@ -70,10 +70,16 @@ function Board({ run, duel, onNext, onLeave }: { run: RunView; duel?: DuelState;
     })
   }
 
-  const word = (p: number[]) => p.map(i => board.grid[i]).join('')
-  const centers = () => Array.from({ length: N * N }, (_, i) => ({ x: 12 + (i % N) * (cell + 10) + cell / 2, y: 12 + Math.floor(i / N) * (cell + 10) + cell / 2 }))
-  const { ref, path, handlers } = useTrace({
-    centers, radius: () => cell * 0.42,
+  // rotating the board just changes which grid letter sits in each on-screen slot; paths are on-screen slots
+  const [rot, setRot] = useState(0)
+  const slotToGrid = useMemo(() => Array.from({ length: N * N }, (_, d) => {
+    let r = Math.floor(d / N), c = d % N
+    for (let k = 0; k < rot; k++) [r, c] = [N - 1 - c, r]
+    return r * N + c
+  }), [rot])
+  const word = (p: number[]) => p.map(d => board.grid[slotToGrid[d]]).join('')
+  const { ref, path, pointsFor } = useTrace({
+    item: '.wh-cell', radius: 0.42,
     canAdd: (p, i) => { const a = p[p.length - 1]; return Math.abs(Math.floor(a / N) - Math.floor(i / N)) <= 1 && Math.abs((a % N) - (i % N)) <= 1 },
     onAdd: p => sfx.chain(p.length),
     onEnd: p => {
@@ -109,7 +115,14 @@ function Board({ run, duel, onNext, onLeave }: { run: RunView; duel?: DuelState;
 
   const total = TIME + extra
   const R = 25, C = 2 * Math.PI * R
-  const pts = path.map(i => centers()[i])
+  const pts = pointsFor(path)
+  // words-by-length tracker
+  const byLen = useMemo(() => {
+    const m: Record<number, { total: number; found: number }> = {}
+    for (const w of board.words.keys()) (m[w.length] ??= { total: 0, found: 0 }).total++
+    for (const w of found) if (m[w.length]) m[w.length].found++
+    return Object.entries(m).map(([l, v]) => ({ len: Number(l), ...v })).sort((a, b) => a.len - b.len)
+  }, [board, found])
 
   return (
     <>
@@ -154,25 +167,37 @@ function Board({ run, duel, onNext, onLeave }: { run: RunView; duel?: DuelState;
           </AnimatePresence>
         </div>
 
-        <div className="wh-board" style={{ width: boardPx }} ref={ref} {...handlers}>
+        <div className="wh-board" style={{ width: boardPx }} ref={ref}>
           <svg className="wh-svg" width={boardPx} height={boardPx} style={{ overflow: 'visible' }}>
             {pts.length > 1 && <polyline points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#141414" strokeOpacity=".85" strokeWidth={cell * 0.16} strokeLinecap="round" strokeLinejoin="round" />}
           </svg>
-          <div className="wh-grid" style={{ gridTemplateColumns: `repeat(${N}, 1fr)` }}>
-            {board.grid.map((ch, i) => (
-              <motion.div key={run.id + i} className={`wh-cell ${path.includes(i) ? 'sel ' + curState : ''}`}
-                initial={{ scale: 0, rotate: -15 }} animate={{ scale: 1, rotate: 0 }} transition={{ delay: i * 0.025, type: 'spring', stiffness: 400, damping: 20 }}
+          <motion.div key={rot} className="wh-grid" style={{ gridTemplateColumns: `repeat(${N}, 1fr)` }}
+            initial={rot ? { rotate: -90, scale: .92 } : false} animate={{ rotate: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 22 }}>
+            {slotToGrid.map((g, i) => (
+              <motion.div key={run.id + ':' + i} className={`wh-cell ${path.includes(i) ? 'sel ' + curState : ''}`}
+                initial={rot ? false : { scale: 0, rotate: -15 }} animate={{ scale: 1, rotate: 0 }} transition={{ delay: i * 0.025, type: 'spring', stiffness: 400, damping: 20 }}
                 style={{ fontSize: cell * 0.46 }}>
-                {ch}
+                {board.grid[g]}
               </motion.div>
+            ))}
+          </motion.div>
+        </div>
+
+        <div className="row" style={{ marginTop: 14, gap: 8 }}>
+          <button className="btn small" onClick={() => { setRot(r => (r + 1) % 4) }} aria-label="Zungusha ubao"><Icon name="refresh" size={16} /> Zungusha</button>
+          <div className="grow" style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
+            {byLen.map(b => (
+              <div key={b.len} className="len-chip" style={{ ['--p' as any]: `${(b.found / b.total) * 100}%` }} title={`Maneno ya herufi ${b.len}`}>
+                <b>{b.len}</b><span>{b.found}/{b.total}</span>
+              </div>
             ))}
           </div>
         </div>
-
-        <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', maxHeight: 72, overflow: 'hidden' }}>
-          {found.slice().reverse().map(w => (
-            <motion.span key={w} layout initial={{ scale: 0, rotate: -10 }} animate={{ scale: 1, rotate: 0 }} className="chip" style={{ textTransform: 'uppercase' }}>{w}</motion.span>
-          ))}
+        <div className="found-words">
+          {found.length === 0 ? <span className="mute" style={{ fontWeight: 700, fontSize: 13 }}>Maneno utakayopata yataonekana hapa</span>
+            : found.slice().reverse().map(w => (
+              <motion.span key={w} layout initial={{ scale: 0, rotate: -10 }} animate={{ scale: 1, rotate: 0 }} className="chip" style={{ textTransform: 'uppercase', background: w.length >= 5 ? 'var(--gold)' : undefined, color: w.length >= 5 ? '#141414' : undefined }}>{w}</motion.span>
+            ))}
         </div>
         <div style={{ marginTop: 'auto' }}>
           {!duel && started && !result && <button className="btn small block" disabled={ending} onClick={end} style={{ marginBottom: 6 }}>Maliza mapema</button>}

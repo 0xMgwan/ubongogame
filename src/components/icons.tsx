@@ -47,6 +47,7 @@ const paths: Record<string, (f: string) => JSX.Element> = {
   star: f => <path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.8l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8Z" {...S} fill={f} />,
   calendar: f => <><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" {...S} fill={f} /><path d="M3.5 10h17M8 3v4M16 3v4" {...S} /></>,
   video: f => <><rect x="3" y="6" width="13" height="12" rx="2.5" {...S} fill={f} /><path d="m16 10.5 5-3v9l-5-3" {...S} /></>,
+  keyboard: f => <><rect x="2.5" y="6" width="19" height="12" rx="2.5" {...S} fill={f} /><path d="M6 9.5h.01M9.5 9.5h.01M13 9.5h.01M16.5 9.5h.01M6 12.5h.01M9.5 12.5h.01M13 12.5h.01M16.5 12.5h.01M8 15.2h8" {...S} strokeWidth={2.4} /></>,
   sun: f => <><circle cx="12" cy="12" r="4.5" {...S} fill={f} /><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" {...S} /></>,
   moon: f => <path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10Z" {...S} fill={f} />,
   iosShare: () => <><path d="M12 3v12M8 7l4-4 4 4" {...S} /><path d="M8.5 10.5H6v10h12v-10h-2.5" {...S} /></>,
