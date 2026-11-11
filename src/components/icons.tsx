@@ -47,6 +47,8 @@ const paths: Record<string, (f: string) => JSX.Element> = {
   star: f => <path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.8l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8Z" {...S} fill={f} />,
   calendar: f => <><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" {...S} fill={f} /><path d="M3.5 10h17M8 3v4M16 3v4" {...S} /></>,
   video: f => <><rect x="3" y="6" width="13" height="12" rx="2.5" {...S} fill={f} /><path d="m16 10.5 5-3v9l-5-3" {...S} /></>,
+  picture: f => <><rect x="3" y="4.5" width="18" height="15" rx="2.5" {...S} fill={f} /><circle cx="9" cy="9.5" r="1.8" {...S} strokeWidth={1.8} /><path d="m3.5 17 5-5 4 4 2.5-2.5L21 19" {...S} /></>,
+  file: f => <><path d="M6 2.5h8l4.5 4.5v14.5H6Z" {...S} fill={f} /><path d="M14 2.5V7h4.5M9 12h6M9 15.5h6" {...S} /></>,
   ban: () => <><circle cx="12" cy="12" r="8.5" {...S} /><path d="m6 6 12 12" {...S} /></>,
   search: f => <><circle cx="10.5" cy="10.5" r="6.5" {...S} fill={f} /><path d="m15.5 15.5 5 5" {...S} strokeWidth={2.8} /></>,
   logout: () => <><path d="M14 4.5H6.5v15H14M10 12h10M16.5 8.5 20 12l-3.5 3.5" {...S} /></>,

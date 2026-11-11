@@ -107,7 +107,8 @@ function useSponsorClick(sp: Sponsor) {
   return () => {
     if (sp.house || !sp.id) return open(true)
     api(`/sponsors/${sp.id}/event`, { body: { type: 'click' } }).catch(() => {})
-    if (sp.link) window.open(sp.link, '_blank', 'noopener,noreferrer')
+    const target = sp.link || sp.pdf // a website first, otherwise the advertiser's PDF flyer
+    if (target) window.open(target, '_blank', 'noopener,noreferrer')
   }
 }
 export function AdIcon({ sp, size = 46 }: { sp: Pick<Sponsor, 'icon' | 'color'>; size?: number }) {
@@ -119,6 +120,7 @@ export function AdBanner({ slot, seed = 0 }: { slot: string; seed?: number }) {
   const click = useSponsorClick(sp)
   useEffect(() => { if (!pro) trackImpression(sp, `${slot}:${sp.id}:${seed}`) }, [sp.id, pro])
   if (pro && !sp.house) return null
+  if (sp.image) return <AdPicture sp={sp} onClick={click} />
   return (
     <motion.button whileTap={{ scale: .98 }} onClick={click} className={`ad ${sp.house ? 'house' : ''}`}>
       <span className="ad-tag">{sp.house ? 'Nafasi wazi' : 'Tangazo'}</span>
@@ -131,6 +133,23 @@ export function AdBanner({ slot, seed = 0 }: { slot: string; seed?: number }) {
     </motion.button>
   )
 }
+/** A picture ad: the advertiser's image with a brand strip underneath. */
+export function AdPicture({ sp, onClick }: { sp: Sponsor; onClick?: () => void }) {
+  return (
+    <motion.button whileTap={{ scale: .98 }} onClick={onClick} className="ad ad-pic" style={{ background: sp.color }}>
+      <span className="ad-tag">Tangazo</span>
+      <img src={sp.image!} alt={sp.brand} loading="lazy" />
+      <div className="row" style={{ padding: '10px 12px', gap: 10 }}>
+        <div className="grow" style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 900 }}>{sp.brand}</div>
+          <div style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sp.line}</div>
+        </div>
+        <span className="chip ink">{sp.pdf && !sp.link ? <><Icon name="file" size={12} fill="var(--gold)" /> PDF</> : sp.cta}</span>
+      </div>
+    </motion.button>
+  )
+}
+
 export function SponsorStrip({ slot, label = 'Imeletwa kwako na' }: { slot: string; label?: string }) {
   const pro = useStore(s => s.pro)
   const sp = useSponsor(slot, 1)
@@ -238,8 +257,10 @@ export function RewardedAd({ open, onDone, onClose, reward }: { open: boolean; o
     <Dialog open={open}>
       <div className="kicker"><Icon name="video" size={14} /> Tangazo · {reward}</div>
       <div style={{ margin: '14px 0', height: 210, borderRadius: 18, background: sp.color, border: 'var(--line)', display: 'grid', placeItems: 'center', position: 'relative', overflow: 'hidden', color: '#141414' }}>
-        <motion.div animate={{ scale: [1, 1.12, 1], rotate: [0, 6, -6, 0] }} transition={{ repeat: Infinity, duration: 2.4 }}><AdIcon sp={{ ...sp, color: '#fffdf8' }} size={92} /></motion.div>
-        <div style={{ position: 'absolute', bottom: 12, left: 14, right: 14 }}>
+        {sp.image
+          ? <motion.img src={sp.image} alt={sp.brand} initial={{ scale: 1.08 }} animate={{ scale: 1 }} transition={{ duration: 5 }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <motion.div animate={{ scale: [1, 1.12, 1], rotate: [0, 6, -6, 0] }} transition={{ repeat: Infinity, duration: 2.4 }}><AdIcon sp={{ ...sp, color: '#fffdf8' }} size={92} /></motion.div>}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px 14px', background: sp.image ? '#fffdf8' : undefined, borderTop: sp.image ? '2.5px solid #141414' : undefined }}>
           <div className="display" style={{ fontSize: 26 }}>{sp.brand}</div>
           <div style={{ fontSize: 13, fontWeight: 700 }}>{sp.line}</div>
         </div>

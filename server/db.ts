@@ -155,6 +155,20 @@ CREATE TABLE IF NOT EXISTS ad_campaigns (
   created_at BIGINT NOT NULL
 );
 
+-- ad creatives (picture / PDF flyer); see server/assets.ts
+CREATE TABLE IF NOT EXISTS ad_assets (
+  id TEXT PRIMARY KEY,
+  player_id BIGINT NOT NULL REFERENCES players(id),
+  kind TEXT NOT NULL,              -- image | pdf
+  mime TEXT NOT NULL,
+  size INT NOT NULL,
+  data BYTEA NOT NULL,
+  campaign_id BIGINT,
+  created_at BIGINT NOT NULL
+);
+ALTER TABLE ad_campaigns ADD COLUMN IF NOT EXISTS image_id TEXT;
+ALTER TABLE ad_campaigns ADD COLUMN IF NOT EXISTS pdf_id TEXT;
+
 CREATE TABLE IF NOT EXISTS league_payouts (
   week TEXT PRIMARY KEY,
   winners JSONB NOT NULL,

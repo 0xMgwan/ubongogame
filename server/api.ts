@@ -6,6 +6,7 @@ import { ApiError, addItem, award, createPlayer, isPro, lockPlayer, me, mustPlay
 import { games, h } from './games.js'
 import { duels } from './duels.js'
 import { challenges, publicChallenges } from './challenges.js'
+import { assetUrl, assets, attachAsset, publicAssets } from './assets.js'
 import { paymentsInfo, refreshPayment, startPayment } from './payments.js'
 import {
   AD_COLORS, AD_ICONS, AD_SLOTS, AVATARS, CHEST, COIN_PACKS, DAILY_BONUS, FRAMES, FrameId, GAME_IDS, ITEMS, LEAGUE_PRIZE_GEMS,
@@ -13,6 +14,8 @@ import {
 } from '../src/shared/catalog.js'
 import { dayKey, weekKey } from '../src/lib/rng.js'
 
+/** A live campaign as the app sees it (file ids → URLs). */
+const sponsorView = (r: any) => ({ id: r.id, slot: r.slot, brand: r.brand, line: r.line, cta: r.cta, link: r.link, icon: r.icon, color: r.color, image: assetUrl(r.image_id), pdf: assetUrl(r.pdf_id) })
 const clean = (v: unknown, max: number) => String(v ?? '').replace(/[\u0000-\u001f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max)
 
 export const api = Router()
@@ -49,8 +52,8 @@ api.post('/auth/restore', rateLimit(10, 15 * 60_000), h(async (req, res) => {
 
 api.get('/sponsors', h(async (_req, res) => {
   const now = Date.now()
-  const rows = await sql`SELECT id, slot, brand, line, cta, link, icon, color FROM ad_campaigns WHERE status = 'live' AND starts_at <= ${now} AND ends_at > ${now}`
-  res.set('Cache-Control', 'public, max-age=60, s-maxage=60').json({ sponsors: rows })
+  const rows = await sql<any[]>`SELECT id, slot, brand, line, cta, link, icon, color, image_id, pdf_id FROM ad_campaigns WHERE status = 'live' AND starts_at <= ${now} AND ends_at > ${now}`
+  res.set('Cache-Control', 'public, max-age=60, s-maxage=60').json({ sponsors: rows.map(sponsorView) })
 }))
 api.post('/sponsors/:id/event', rateLimit(120, 60_000), h(async (req, res) => {
   const id = Number(req.params.id)
@@ -59,6 +62,7 @@ api.post('/sponsors/:id/event', rateLimit(120, 60_000), h(async (req, res) => {
   res.json({ ok: true })
 }))
 api.use(publicChallenges)
+api.use(publicAssets)
 
 // ---------------- everything below needs a player ----------------
 api.use(requirePlayer)
@@ -66,6 +70,7 @@ api.use((req, _res, next) => { sql`UPDATE players SET last_seen = ${Date.now()} 
 api.use(games)
 api.use(duels)
 api.use(challenges)
+api.use(assets)
 
 api.get('/me', h(async (req, res) => res.json({ me: await me(req.pid), payments: paymentsInfo() })))
 
@@ -116,12 +121,12 @@ api.post('/daily/chest', h(async (req, res) => {
 // ---------------- rewarded ads ----------------
 api.post('/ads/view', h(async (req, res) => {
   const now = Date.now()
-  const [live] = await sql<any[]>`SELECT id, brand, line, cta, link, icon, color FROM ad_campaigns
+  const [live] = await sql<any[]>`SELECT id, brand, line, cta, link, icon, color, image_id, pdf_id FROM ad_campaigns
     WHERE status = 'live' AND slot = 'reward' AND starts_at <= ${now} AND ends_at > ${now} ORDER BY random() LIMIT 1`
   const id = 'adv_' + crypto.randomBytes(9).toString('base64url')
   await sql`INSERT INTO ad_views (id, player_id, campaign_id, started_at) VALUES (${id}, ${req.pid}, ${live?.id ?? null}, ${now})`
   if (live) await sql`UPDATE ad_campaigns SET impressions = impressions + 1 WHERE id = ${live.id}`
-  res.json({ adViewId: id, sponsor: live ?? null, minWatchMs: REWARD_AD.minWatchMs })
+  res.json({ adViewId: id, sponsor: live ? sponsorView(live) : null, minWatchMs: REWARD_AD.minWatchMs })
 }))
 api.post('/ads/claim', h(async (req, res) => {
   const today = dayKey()
@@ -190,16 +195,23 @@ api.post('/ads', rateLimit(10, 60 * 60_000, req => String(req.pid)), h(async (re
   if (contact.length < 6) throw new ApiError(400, 'Weka namba ya simu au barua pepe ya mawasiliano')
   const link: string | null = clean(b.link, 120) || null
   if (link && !/^https:\/\/[^\s]+$/i.test(link)) throw new ApiError(400, 'Kiungo kianze na https://')
-  const [campaign] = await sql`
-    INSERT INTO ad_campaigns (player_id, slot, brand, line, cta, link, icon, color, contact, days, price_tzs, status, created_at)
-    VALUES (${req.pid}, ${slot.id}, ${brand}, ${line || brand}, ${clean(b.cta, 14) || 'Tazama'}, ${link},
-      ${(AD_ICONS as readonly string[]).includes(b.icon) ? b.icon : AD_ICONS[0]}, ${AD_COLORS.includes(b.color) ? b.color : AD_COLORS[0]},
-      ${contact}, ${days}, ${adPrice(slot.id, days)}, 'awaiting_payment', ${Date.now()})
-    RETURNING *`
+  const campaign = await sql.begin(async tx => {
+    const [c] = await tx<any[]>`
+      INSERT INTO ad_campaigns (player_id, slot, brand, line, cta, link, icon, color, contact, days, price_tzs, status, created_at)
+      VALUES (${req.pid}, ${slot.id}, ${brand}, ${line || brand}, ${clean(b.cta, 14) || 'Tazama'}, ${link},
+        ${(AD_ICONS as readonly string[]).includes(b.icon) ? b.icon : AD_ICONS[0]}, ${AD_COLORS.includes(b.color) ? b.color : AD_COLORS[0]},
+        ${contact}, ${days}, ${adPrice(slot.id, days)}, 'awaiting_payment', ${Date.now()})
+      RETURNING *`
+    const imageId = await attachAsset(tx, req.pid, c.id, b.imageId, 'image')
+    const pdfId = await attachAsset(tx, req.pid, c.id, b.pdfId, 'pdf')
+    const [done] = await tx`UPDATE ad_campaigns SET image_id = ${imageId}, pdf_id = ${pdfId} WHERE id = ${c.id} RETURNING *`
+    return done
+  })
   res.json({ campaign })
 }))
 api.get('/ads/mine', h(async (req, res) => {
-  res.json({ campaigns: await sql`SELECT id, slot, brand, line, days, price_tzs, status, review_note, starts_at, ends_at, impressions, clicks, created_at FROM ad_campaigns WHERE player_id = ${req.pid} ORDER BY id DESC LIMIT 20` })
+  const rows = await sql<any[]>`SELECT id, slot, brand, line, icon, color, image_id, pdf_id, days, price_tzs, status, review_note, starts_at, ends_at, impressions, clicks, created_at FROM ad_campaigns WHERE player_id = ${req.pid} ORDER BY id DESC LIMIT 20`
+  res.json({ campaigns: rows.map(r => ({ ...r, image: assetUrl(r.image_id), pdf: assetUrl(r.pdf_id) })) })
 }))
 
 // ---------------- leaderboard ----------------
@@ -237,7 +249,9 @@ admin.get('/overview', h(async (_req, res) => {
     (SELECT COUNT(*)::int FROM challenges WHERE created_at > ${now - 86400_000}) challenges_today,
     (SELECT COUNT(*)::int FROM players WHERE pro_until > ${now}) pro`
   const revenue = await sql`SELECT product, COUNT(*)::int n, SUM(amount_tzs)::int tzs FROM payments WHERE status = 'paid' GROUP BY product`
-  const campaigns = await sql`SELECT c.*, p.name player FROM ad_campaigns c JOIN players p ON p.id = c.player_id
+  const campaigns = await sql`SELECT c.*, p.name player,
+      (SELECT size FROM ad_assets WHERE id = c.image_id) image_size, (SELECT size FROM ad_assets WHERE id = c.pdf_id) pdf_size
+    FROM ad_campaigns c JOIN players p ON p.id = c.player_id
     ORDER BY CASE c.status WHEN 'in_review' THEN 0 WHEN 'live' THEN 1 ELSE 2 END, c.id DESC LIMIT 100`
   res.json({ ...k, revenue, campaigns })
 }))
@@ -264,6 +278,8 @@ cron.get('/housekeeping', requireCron, h(async (_req, res) => res.json(await hou
 export async function housekeeping() {
   const now = Date.now()
   await sql`UPDATE ad_campaigns SET status = 'ended' WHERE status = 'live' AND ends_at <= ${now}`
+  // uploads that never made it into a campaign
+  await sql`DELETE FROM ad_assets WHERE campaign_id IS NULL AND created_at < ${now - 86400_000}`
   await sql`UPDATE duels SET status = 'cancelled' WHERE status = 'waiting' AND created_at < ${now - 15 * 60_000}`
   const lastWeek = weekKey(new Date(now - 7 * 86400_000))
   const paid = await sql.begin(async tx => {

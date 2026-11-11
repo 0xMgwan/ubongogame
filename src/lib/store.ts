@@ -26,7 +26,7 @@ export type Me = {
   stats: Record<GameId, { played: number; won: number; best: number }>
   weekly: number; today: string; dayIndex: number; week: string
 }
-export type Sponsor = { id?: number; slot?: string; brand: string; line: string; cta: string; link?: string | null; icon: string; color: string; house?: boolean }
+export type Sponsor = { id?: number; slot?: string; brand: string; line: string; cta: string; link?: string | null; icon: string; color: string; image?: string | null; pdf?: string | null; house?: boolean }
 
 const BLANK: Me = {
   id: 0, name: 'Mchezaji', avatar: 'simba', region: 'Dar es Salaam', coins: 0, gems: 0, xp: 0, pro: false, proUntil: 0,

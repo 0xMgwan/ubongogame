@@ -32,6 +32,7 @@ app.use((_req, res) => res.status(404).json({ error: 'Haipo', code: 'not_found' 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof ApiError) return res.status(err.status).json({ error: err.message, code: err.code })
   if (err?.type === 'entity.parse.failed') return res.status(400).json({ error: 'JSON si sahihi' })
+  if (err?.type === 'entity.too.large') return res.status(413).json({ error: 'Faili ni kubwa mno (zaidi ya MB 3)', code: 'too_large' })
   console.error(err)
   res.status(500).json({ error: 'Hitilafu ya seva. Jaribu tena.' })
 })

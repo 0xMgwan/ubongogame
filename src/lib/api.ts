@@ -30,3 +30,17 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   }
   return body as T
 }
+
+/** Upload a file as the raw request body (ad pictures / PDFs). */
+export async function upload<T = any>(path: string, file: Blob): Promise<T> {
+  const t = getToken()
+  let res: Response
+  try {
+    res = await fetch(BASE + '/api' + path, { method: 'POST', headers: { 'content-type': file.type || 'application/octet-stream', ...(t ? { authorization: `Bearer ${t}` } : {}) }, body: file })
+  } catch {
+    throw new ApiError(0, 'Hakuna mtandao. Angalia intaneti yako.', 'offline')
+  }
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new ApiError(res.status, body.error || (res.status === 413 ? 'Faili ni kubwa mno (zaidi ya MB 3)' : 'Imeshindikana kupakia faili'), body.code)
+  return body as T
+}
