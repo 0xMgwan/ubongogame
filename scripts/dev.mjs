@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 
 const env = { ...process.env }
-if (fs.existsSync('.env')) for (const line of fs.readFileSync('.env', 'utf8').split('\n')) {
+for (const file of ['.env.local', '.env']) if (fs.existsSync(file)) for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
   const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/); if (m && m[2] && !(m[1] in env)) env[m[1]] = m[2].replace(/^["']|["']$/g, '')
 }
 const procs = []
