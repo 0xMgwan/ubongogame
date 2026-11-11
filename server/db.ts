@@ -155,6 +155,15 @@ CREATE TABLE IF NOT EXISTS ad_campaigns (
   created_at BIGINT NOT NULL
 );
 
+-- accounts: unique (case-insensitive) names + passwords
+ALTER TABLE players ADD COLUMN IF NOT EXISTS name_key TEXT;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS pass_hash TEXT;
+-- older rows: claim their name if nobody else shares it
+UPDATE players p SET name_key = regexp_replace(lower(p.name), '[[:space:]_.-]+', '', 'g')
+  WHERE p.name_key IS NULL AND NOT EXISTS (
+    SELECT 1 FROM players q WHERE q.id <> p.id AND regexp_replace(lower(q.name), '[[:space:]_.-]+', '', 'g') = regexp_replace(lower(p.name), '[[:space:]_.-]+', '', 'g'));
+CREATE UNIQUE INDEX IF NOT EXISTS players_name_key ON players(name_key);
+
 -- ad creatives (picture / PDF flyer); see server/assets.ts
 CREATE TABLE IF NOT EXISTS ad_assets (
   id TEXT PRIMARY KEY,

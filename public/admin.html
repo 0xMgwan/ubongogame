@@ -73,6 +73,41 @@
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #141414; color: #fffdf8; padding: 10px 16px; border-radius: 999px; font-weight: 800; box-shadow: 4px 4px 0 var(--gold); opacity: 0; transition: opacity .2s; pointer-events: none; }
   .toast.on { opacity: 1; }
   @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } .rev-row .name { width: 80px; } .rev-row .amt { width: 100px; } }
+  nav.views { display: flex; gap: 6px; }
+  nav.views button { border: 2px solid var(--ink); background: var(--paper); color: var(--ink); border-radius: 999px; padding: 7px 14px; font: 800 14px 'Plus Jakarta Sans', sans-serif; cursor: pointer; }
+  nav.views button.on { background: var(--gold); color: #141414; box-shadow: 2px 2px 0 var(--ink); }
+  .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+  .chart h4 { margin: 0 0 4px; font-family: var(--display); font-stretch: 80%; font-weight: 900; font-size: 18px; text-transform: uppercase; }
+  .chart .total { font-family: var(--display); font-stretch: 72%; font-weight: 900; font-size: 34px; line-height: 1; }
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 120px; margin-top: 10px; border-bottom: 2px solid var(--ink); }
+  .bars .b { flex: 1; display: flex; flex-direction: column-reverse; min-width: 0; position: relative; }
+  .bars .b i { display: block; border: 1.5px solid var(--ink); border-bottom: 0; border-radius: 4px 4px 0 0; min-height: 2px; }
+  .bars .b:hover::after { content: attr(data-tip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); font-size: 11px; padding: 3px 6px; border-radius: 6px; white-space: nowrap; z-index: 2; }
+  .axis { display: flex; gap: 4px; font-size: 10px; color: var(--mute); margin-top: 4px; }
+  .axis span { flex: 1; text-align: center; }
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; font-weight: 800; margin-top: 8px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border: 1.5px solid var(--ink); border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+  .table-wrap { overflow-x: auto; border: var(--line); border-radius: 18px; box-shadow: var(--shadow); background: var(--paper); }
+  table { width: 100%; border-collapse: collapse; min-width: 860px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 2px dashed var(--soft); white-space: nowrap; }
+  th { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); background: var(--paper); position: sticky; top: 0; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr { cursor: pointer; } tbody tr:hover { background: color-mix(in srgb, var(--gold) 15%, var(--paper)); }
+  .who { display: flex; align-items: center; gap: 10px; font-weight: 800; }
+  .dot { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--ink); display: grid; place-items: center; font-family: var(--display); font-weight: 900; color: #141414; flex: none; }
+  .badge { font-size: 10px; font-weight: 900; padding: 2px 6px; border-radius: 6px; border: 1.5px solid var(--ink); }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .toolbar input { max-width: 320px; height: 42px; }
+  select { height: 42px; border-radius: 12px; border: var(--line); background: var(--paper); color: var(--ink); padding: 0 10px; font: 800 14px 'Plus Jakarta Sans', sans-serif; }
+  .drawer-bg { position: fixed; inset: 0; background: rgba(20,20,20,.45); z-index: 20; display: flex; justify-content: flex-end; }
+  .drawer { width: min(520px, 100%); height: 100%; overflow-y: auto; background: var(--bg); border-left: 3px solid var(--ink); padding: 20px; }
+  .mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .mini div { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: var(--paper); }
+  .mini b { display: block; font-family: var(--display); font-stretch: 78%; font-size: 24px; line-height: 1; }
+  .mini span { font-size: 10.5px; font-weight: 900; color: var(--mute); text-transform: uppercase; letter-spacing: .06em; }
+  .list { display: grid; gap: 6px; }
+  .list div { display: flex; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 2px solid var(--ink); border-radius: 10px; background: var(--paper); font-weight: 700; }
+  .temp { font-family: ui-monospace, Menlo, monospace; font-size: 22px; font-weight: 900; letter-spacing: .1em; background: var(--gold); color: #141414; border: var(--line); border-radius: 12px; padding: 10px 14px; text-align: center; }
 </style>
 </head>
 <body>
@@ -93,19 +128,26 @@ const $ = s => document.querySelector(s)
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const safeUrl = u => (/^(https:\/\/|\/api\/assets\/)/.test(String(u || '')) ? esc(u) : '')
 let KEY = sessionStorage.getItem('ubongo-admin') || ''
-let DATA = null, FILTER = 'in_review'
+let VIEW = sessionStorage.getItem('ubongo-admin-view') || 'overview'
+let DATA = null, AN = null, PLAYERS = null, FILTER = 'in_review', Q = '', SORT = 'active'
 const call = (path, opts = {}) => fetch('/api/admin' + path, { ...opts, headers: { 'content-type': 'application/json', 'x-admin-key': KEY } })
   .then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) { const e = new Error(j.error || r.status); e.status = r.status; throw e } return j })
 const tsh = n => 'TSh ' + Number(n || 0).toLocaleString()
+const num = n => Number(n || 0).toLocaleString()
 const day = t => (t ? new Date(Number(t)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—')
+const ago = t => { if (!t) return '—'; const s = (Date.now() - Number(t)) / 1000; return s < 90 ? 'now' : s < 3600 ? Math.round(s / 60) + 'm ago' : s < 86400 ? Math.round(s / 3600) + 'h ago' : Math.round(s / 86400) + 'd ago' }
 const kb = n => (n ? (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB') : '')
+const level = xp => Math.floor(Math.sqrt((xp || 0) / 60)) + 1
 const STATUS = { in_review: 'Review', live: 'Live', awaiting_payment: 'Unpaid', rejected: 'Rejected', ended: 'Ended' }
 const SLOT = { banner: 'Home banner', result: 'Results sponsor', reward: 'Reward video', league: 'League sponsor', daily: 'Word of the day' }
+const GAME = { fumbua: ['Fumbua', '#7ed6a8'], mafumbo: ['Mafumbo', '#f5b800'], windo: ['Windo', '#8ec1ff'], pangua: ['Pangua', '#ff9fb6'] }
+const ANIMAL = { simba: '#ffd48a', tembo: '#cfe3ff', twiga: '#fff0b8', punda: '#d9f2e5', chui: '#ffe0b3', kifaru: '#e6e1f5', kiboko: '#f5d6e8', kasuku: '#c9f0d4', kobe: '#e2f0c4', tumbili: '#ffe2cc' }
 function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 1800) }
 
 async function load() {
   try {
-    DATA = await call('/overview')
+    ;[DATA, AN] = await Promise.all([call('/overview'), call('/analytics')])
+    if (VIEW === 'players') PLAYERS = await call(`/players?sort=${SORT}&q=${encodeURIComponent(Q)}`)
     $('#login').hidden = true; $('#app').hidden = false
     render()
   } catch (e) {
@@ -114,41 +156,126 @@ async function load() {
   }
 }
 
-function render() {
-  const d = DATA
-  const rev = d.revenue.reduce((a, r) => a + r.tzs, 0)
-  const max = Math.max(1, ...d.revenue.map(r => r.tzs))
-  const counts = d.campaigns.reduce((a, c) => (a[c.status] = (a[c.status] || 0) + 1, a), {})
-  const list = d.campaigns.filter(c => FILTER === 'all' || c.status === FILTER)
-  $('#app').innerHTML = `
-    <header>
-      <div class="brand"><img src="/icon.svg" width="30" height="30" alt="" /> UBONGO ADMIN</div>
-      <div class="grow"></div>
-      <button class="btn sm" data-act="refresh">↻ Refresh</button>
-      <button class="btn sm" data-act="logout">Log out</button>
-    </header>
-    <span class="kicker">Dashibodi ya leo</span>
+function header() {
+  return `<header>
+    <div class="brand"><img src="/icon.svg" width="30" height="30" alt="" /> UBONGO ADMIN</div>
+    <nav class="views">${[['overview', 'Muhtasari'], ['players', 'Wachezaji'], ['ads', 'Matangazo']].map(([k, l]) => `<button class="${VIEW === k ? 'on' : ''}" data-view="${k}">${l}</button>`).join('')}</nav>
+    <div class="grow"></div>
+    <button class="btn sm" data-act="refresh">↻</button>
+    <button class="btn sm" data-act="logout">Log out</button>
+  </header>`
+}
+function render() { $('#app').innerHTML = header() + (VIEW === 'players' ? playersView() : VIEW === 'ads' ? adsView() : overview()) }
+
+// ---------------------------------------------------------------- overview
+function series(rows, key = 'n') { const m = Object.fromEntries(rows.map(r => [r.day, r[key]])); return AN.days.map(d => m[d] || 0) }
+function barChart(title, values, color, fmt = num) {
+  const max = Math.max(1, ...values), total = values.reduce((a, b) => a + b, 0)
+  return `<div class="card chart"><h4>${title}</h4><div class="total">${fmt(total)}</div><div class="line" style="font-size:12px">last 14 days</div>
+    <div class="bars">${values.map((v, i) => `<div class="b" data-tip="${AN.days[i].slice(5)} · ${fmt(v)}"><i style="height:${(v / max) * 100}%;background:${color}"></i></div>`).join('')}</div>
+    <div class="axis">${AN.days.map((d, i) => `<span>${i % 3 === 0 ? d.slice(8) : ''}</span>`).join('')}</div></div>`
+}
+function stackChart() {
+  const per = Object.keys(GAME).map(g => [g, series(AN.games.filter(r => r.game === g))])
+  const totals = AN.days.map((_, i) => per.reduce((a, [, v]) => a + v[i], 0)), max = Math.max(1, ...totals)
+  return `<div class="card chart"><h4>Games played</h4><div class="total">${num(totals.reduce((a, b) => a + b, 0))}</div><div class="line" style="font-size:12px">last 14 days, by game</div>
+    <div class="bars">${AN.days.map((d, i) => `<div class="b" data-tip="${d.slice(5)} · ${totals[i]}">${per.map(([g, v]) => v[i] ? `<i style="height:${(v[i] / max) * 120}px;background:${GAME[g][1]}"></i>` : '').join('')}</div>`).join('')}</div>
+    <div class="axis">${AN.days.map((d, i) => `<span>${i % 3 === 0 ? d.slice(8) : ''}</span>`).join('')}</div>
+    <div class="legend">${Object.values(GAME).map(([n, c]) => `<span><i style="background:${c}"></i>${n}</span>`).join('')}</div></div>`
+}
+function overview() {
+  const d = DATA, rev = d.revenue.reduce((a, r) => a + r.tzs, 0), maxRev = Math.max(1, ...d.revenue.map(r => r.tzs))
+  const maxReg = Math.max(1, ...AN.regions.map(r => r.n))
+  const duel = Object.fromEntries(AN.duels.map(x => [x.kind, x]))
+  return `<span class="kicker">Dashibodi</span>
     <h1 class="display" style="font-size:clamp(48px,8vw,88px);margin:12px 0 22px">Hali ya <span class="hl">Ubongo.</span></h1>
     <div class="kpis">
       ${[[d.players, 'Players', '#fffdf8'], [d.dau, 'Active 24h', '#7ed6a8'], [d.runs_today, 'Games today', '#8ec1ff'], [d.duels_today, 'Duels 24h', '#ff9fb6'],
          [d.challenges_today, 'Challenges 24h', '#ffe2c4'], [d.pro, 'Kifalme subs', '#f5b800'], [tsh(rev), 'Revenue paid', '#141414']]
         .map(([v, l, c]) => `<div class="kpi" style="background:${c};${c === '#141414' ? 'color:#f5b800' : ''}"><b style="${String(v).length > 8 ? 'font-size:30px' : ''}">${esc(typeof v === 'number' ? v.toLocaleString() : v)}</b><span>${l}</span></div>`).join('')}
     </div>
-
-    <div class="h-sec"><h2 class="display">Mapato</h2><span class="line">by product, paid only</span></div>
-    <div class="card rev">
-      ${d.revenue.length ? d.revenue.map(r => `<div class="rev-row"><div class="name">${esc(r.product)}</div><div class="bar"><i style="width:${(r.tzs / max) * 100}%"></i></div><div class="amt">${tsh(r.tzs)}</div><div class="line" style="width:36px;text-align:right">×${r.n}</div></div>`).join('')
-        : '<div class="line">No paid payments yet.</div>'}
+    <div class="h-sec"><h2 class="display">Ukuaji</h2><span class="line">EAT days</span></div>
+    <div class="charts">
+      ${barChart('New players', series(AN.signups), '#f5b800')}
+      ${barChart('Active players', series(AN.active), '#7ed6a8')}
+      ${stackChart()}
+      ${barChart('Revenue', series(AN.revenue, 'tzs'), '#e5452b', tsh)}
     </div>
-
-    <div class="h-sec">
-      <h2 class="display">Matangazo</h2>
-      <div class="tabs">${[['in_review', 'Needs review'], ['live', 'Live'], ['awaiting_payment', 'Unpaid'], ['rejected', 'Rejected'], ['ended', 'Ended'], ['all', 'All']]
-        .map(([k, l]) => `<button class="tab ${FILTER === k ? 'on' : ''}" data-filter="${k}">${l}${k !== 'all' && counts[k] ? `<span class="n">${counts[k]}</span>` : ''}</button>`).join('')}</div>
-    </div>
-    ${list.length ? `<div class="grid">${list.map(card).join('')}</div>` : `<div class="card empty"><b class="display" style="font-size:28px">Hakuna kitu hapa</b><p class="line">${FILTER === 'in_review' ? 'No paid ads are waiting for review.' : 'No campaigns in this list.'}</p></div>`}`
+    <div class="h-sec"><h2 class="display">Michezo</h2><span class="line">all time</span></div>
+    <div class="table-wrap"><table style="min-width:640px"><thead><tr><th>Game</th><th class="num">Plays</th><th class="num">Players</th><th class="num">Win rate</th><th class="num">Avg score</th><th class="num">In duels</th><th class="num">Challenges</th></tr></thead>
+      <tbody>${AN.perGame.map(g => `<tr style="cursor:default"><td><span class="who"><span class="dot" style="background:${GAME[g.game]?.[1]}">${esc(g.game[0].toUpperCase())}</span>${esc(GAME[g.game]?.[0] ?? g.game)}</span></td>
+        <td class="num">${num(g.plays)}</td><td class="num">${num(g.players)}</td><td class="num">${g.plays ? Math.round((g.wins / g.plays) * 100) : 0}%</td><td class="num">${num(g.avg_score)}</td><td class="num">${num(g.duel_runs)}</td><td class="num">${num(g.challenge_runs)}</td></tr>`).join('') || '<tr><td colspan="7" class="line">No games yet</td></tr>'}</tbody></table></div>
+    <div class="charts" style="margin-top:14px">
+      <div class="card"><h4 class="display" style="font-size:22px;margin:0 0 10px">Vita</h4>
+        <div class="mini"><div><b>${num(duel.queue?.n)}</b><span>Matched</span></div><div><b>${num(duel.room?.n)}</b><span>Room codes</span></div><div><b>${num(duel.ghost?.n)}</b><span>vs ghost</span></div></div>
+        <div class="mini" style="margin-top:8px"><div><b>${num(AN.challenges.created)}</b><span>Challenge links</span></div><div><b>${num(AN.challenges.plays)}</b><span>Link plays</span></div><div><b>${AN.challenges.created ? (AN.challenges.plays / AN.challenges.created).toFixed(1) : '0'}</b><span>Plays / link</span></div></div></div>
+      <div class="card"><h4 class="display" style="font-size:22px;margin:0 0 10px">Mapato</h4><div class="rev">
+        ${d.revenue.length ? d.revenue.map(r => `<div class="rev-row"><div class="name">${esc(r.product)}</div><div class="bar"><i style="width:${(r.tzs / maxRev) * 100}%"></i></div><div class="amt">${tsh(r.tzs)}</div></div>`).join('') : '<div class="line">No paid payments yet.</div>'}</div></div>
+      <div class="card"><h4 class="display" style="font-size:22px;margin:0 0 10px">Mikoa</h4><div class="rev">
+        ${AN.regions.map(r => `<div class="rev-row"><div class="name">${esc(r.region)}</div><div class="bar"><i style="width:${(r.n / maxReg) * 100}%"></i></div><div class="amt" style="width:50px">${num(r.n)}</div></div>`).join('') || '<div class="line">No players yet.</div>'}</div></div>
+    </div>`
 }
 
+// ---------------------------------------------------------------- players
+function playersView() {
+  const P = PLAYERS || { total: 0, players: [] }
+  return `<span class="kicker">${num(P.total)} wachezaji</span>
+    <h1 class="display" style="font-size:clamp(44px,7vw,76px);margin:12px 0 18px">Wa<span class="hl">chezaji.</span></h1>
+    <form class="toolbar" id="pq"><input id="q" placeholder="Search name or region" value="${esc(Q)}" />
+      <select id="sort">${[['active', 'Last active'], ['recent', 'Newest'], ['xp', 'Level'], ['games', 'Most games'], ['coins', 'Coins'], ['spent', 'Spent (TSh)'], ['duels', 'Duel wins']].map(([k, l]) => `<option value="${k}" ${SORT === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <button class="btn ink">Search</button></form>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Player</th><th>Region</th><th class="num">Lvl</th><th class="num">Games</th><th class="num">Wins</th><th class="num">Score</th><th class="num">Coins</th><th class="num">Gems</th><th class="num">Duels W/P</th><th class="num">Streak</th><th class="num">Spent</th><th>Last seen</th><th>Joined</th></tr></thead>
+      <tbody>${P.players.map(p => `<tr data-player="${p.id}">
+        <td><span class="who"><span class="dot" style="background:${ANIMAL[p.avatar] || '#eee'}">${esc(p.name[0])}</span>${esc(p.name)}
+          ${p.pro_until > Date.now() ? '<span class="badge" style="background:#f5b800;color:#141414">KIFALME</span>' : ''}${p.has_password ? '' : '<span class="badge" title="No password">no pw</span>'}</span></td>
+        <td>${esc(p.region)}</td><td class="num">${level(p.xp)}</td><td class="num">${num(p.games)}</td><td class="num">${num(p.wins)}</td><td class="num">${num(p.total_score)}</td>
+        <td class="num">${num(p.coins)}</td><td class="num">${num(p.gems)}</td><td class="num">${p.duel_wins}/${p.duel_played}</td><td class="num">${p.streak}</td>
+        <td class="num">${p.spent ? tsh(p.spent) : '—'}</td><td>${ago(p.last_seen)}</td><td>${day(p.created_at)}</td></tr>`).join('') || '<tr><td colspan="13" class="line">No players found</td></tr>'}</tbody>
+    </table></div>`
+}
+async function openPlayer(id) {
+  const d = await call('/players/' + id)
+  const p = d.player
+  const bg = document.createElement('div'); bg.className = 'drawer-bg'
+  bg.innerHTML = `<aside class="drawer">
+    <div style="display:flex;align-items:center;gap:12px"><span class="dot" style="width:56px;height:56px;font-size:26px;background:${ANIMAL[p.avatar] || '#eee'}">${esc(p.name[0])}</span>
+      <div class="grow"><h2 class="display" style="font-size:38px">${esc(p.name)}</h2><div class="line">${esc(p.region)} · Level ${level(p.xp)} · joined ${day(p.created_at)} · seen ${ago(p.last_seen)}</div></div>
+      <button class="btn sm" data-close>✕</button></div>
+    <div class="mini" style="margin-top:16px"><div><b>${num(p.coins)}</b><span>Coins</span></div><div><b>${num(p.gems)}</b><span>Gems</span></div><div><b>${num(p.xp)}</b><span>XP</span></div>
+      <div><b>${p.streak}</b><span>Streak (best ${p.best_streak})</span></div><div><b>${p.duel_wins}/${p.duel_played}</b><span>Duels W/P</span></div><div><b>${p.pangua_level}</b><span>Pangua level</span></div></div>
+    <h3 class="display" style="font-size:22px;margin:20px 0 8px">Per game</h3>
+    <div class="list">${d.games.map(g => `<div><span>${esc(GAME[g.game]?.[0] ?? g.game)}</span><span>${g.played} played · ${g.won} won · best ${num(g.best)} · avg ${num(g.avg)}</span></div>`).join('') || '<div>No games yet</div>'}</div>
+    <h3 class="display" style="font-size:22px;margin:20px 0 8px">Recent games</h3>
+    <div class="list">${d.runs.map(r => `<div><span>${esc(GAME[r.game]?.[0] ?? r.game)} · ${esc(r.mode)}${r.won ? ' ✓' : ''}</span><span>${num(r.score)} pts · +${r.coins} · ${ago(r.finished_at)}</span></div>`).join('') || '<div>—</div>'}</div>
+    <h3 class="display" style="font-size:22px;margin:20px 0 8px">Payments</h3>
+    <div class="list">${d.payments.map(y => `<div><span>${esc(y.product)} · ${esc(y.provider)}</span><span>${tsh(y.amount_tzs)} · ${esc(y.status)} · ${day(y.created_at)}</span></div>`).join('') || '<div>None</div>'}</div>
+    ${d.campaigns.length ? `<h3 class="display" style="font-size:22px;margin:20px 0 8px">Ads</h3><div class="list">${d.campaigns.map(c => `<div><span>${esc(c.brand)} · ${SLOT[c.slot] || esc(c.slot)}</span><span>${tsh(c.price_tzs)} · ${STATUS[c.status] || esc(c.status)}</span></div>`).join('')}</div>` : ''}
+    <h3 class="display" style="font-size:22px;margin:20px 0 8px">Support</h3>
+    <p class="line" style="margin:0 0 8px">${p.has_password ? 'Player has a password.' : 'Player has no password yet.'} If they lost both their password and recovery code, set a temporary password and send it to them; they can change it in Mimi → Akaunti.</p>
+    <button class="btn red" data-reset="${p.id}">Set temporary password</button><div id="tempout" style="margin-top:10px"></div>
+  </aside>`
+  bg.addEventListener('click', async e => {
+    if (e.target === bg || e.target.closest('[data-close]')) return bg.remove()
+    const r = e.target.closest('[data-reset]')
+    if (r && confirm(`Replace ${p.name}'s password with a temporary one?`)) {
+      const out = await call(`/players/${p.id}/reset-password`, { method: 'POST' }).catch(err => alert(err.message))
+      if (out) bg.querySelector('#tempout').innerHTML = `<div class="temp">${esc(out.tempPassword)}</div><p class="line">Shown once. Send it to ${esc(p.name)} privately.</p>`
+    }
+  })
+  document.body.appendChild(bg)
+}
+
+// ---------------------------------------------------------------- ads
+function adsView() {
+  const counts = DATA.campaigns.reduce((a, c) => (a[c.status] = (a[c.status] || 0) + 1, a), {})
+  const list = DATA.campaigns.filter(c => FILTER === 'all' || c.status === FILTER)
+  return `<span class="kicker">Ukaguzi</span>
+    <h1 class="display" style="font-size:clamp(44px,7vw,76px);margin:12px 0 18px">Mata<span class="hl">ngazo.</span></h1>
+    <div class="tabs" style="margin-bottom:16px">${[['in_review', 'Needs review'], ['live', 'Live'], ['awaiting_payment', 'Unpaid'], ['rejected', 'Rejected'], ['ended', 'Ended'], ['all', 'All']]
+      .map(([k, l]) => `<button class="tab ${FILTER === k ? 'on' : ''}" data-filter="${k}">${l}${k !== 'all' && counts[k] ? `<span class="n">${counts[k]}</span>` : ''}</button>`).join('')}</div>
+    ${list.length ? `<div class="grid">${list.map(card).join('')}</div>` : `<div class="card empty"><b class="display" style="font-size:28px">Hakuna kitu hapa</b><p class="line">${FILTER === 'in_review' ? 'No paid ads are waiting for review.' : 'No campaigns in this list.'}</p></div>`}`
+}
 function card(c) {
   const img = safeUrl(c.image_id ? '/api/assets/' + c.image_id : '')
   const pdf = safeUrl(c.pdf_id ? '/api/assets/' + c.pdf_id : '')
@@ -170,7 +297,7 @@ function card(c) {
       <div class="meta"><span class="chip">☎ ${esc(c.contact)}</span><span class="chip">by ${esc(c.player)}</span></div>
       <div style="display:flex;align-items:end;justify-content:space-between;gap:10px">
         <div class="price">${tsh(c.price_tzs)}</div>
-        ${c.status === 'live' || c.status === 'ended' ? `<div class="stats"><span><b>${c.impressions.toLocaleString()}</b> views</span><span><b>${c.clicks.toLocaleString()}</b> taps</span></div>` : ''}
+        ${c.status === 'live' || c.status === 'ended' ? `<div class="stats"><span><b>${num(c.impressions)}</b> views</span><span><b>${num(c.clicks)}</b> taps</span></div>` : ''}
       </div>
       ${c.status === 'live' ? `<div class="line">Live until ${day(c.ends_at)}</div>` : ''}
       ${c.review_note ? `<div class="note">${esc(c.review_note)}</div>` : ''}
@@ -180,8 +307,17 @@ function card(c) {
   </article>`
 }
 
+// ---------------------------------------------------------------- events
 $('#form').onsubmit = e => { e.preventDefault(); KEY = $('#key').value.trim(); sessionStorage.setItem('ubongo-admin', KEY); $('#err').textContent = ''; load() }
+document.addEventListener('submit', async e => {
+  if (e.target.id !== 'pq') return
+  e.preventDefault(); Q = $('#q').value.trim(); SORT = $('#sort').value
+  PLAYERS = await call(`/players?sort=${SORT}&q=${encodeURIComponent(Q)}`); render()
+})
+document.addEventListener('change', async e => { if (e.target.id === 'sort') { SORT = e.target.value; PLAYERS = await call(`/players?sort=${SORT}&q=${encodeURIComponent(Q)}`); render() } })
 document.addEventListener('click', async e => {
+  const v = e.target.closest('[data-view]'); if (v) { VIEW = v.dataset.view; sessionStorage.setItem('ubongo-admin-view', VIEW); if (VIEW === 'players' && !PLAYERS) PLAYERS = await call(`/players?sort=${SORT}`); render(); return }
+  const row = e.target.closest('tr[data-player]'); if (row) { openPlayer(row.dataset.player).catch(err => alert(err.message)); return }
   const f = e.target.closest('[data-filter]'); if (f) { FILTER = f.dataset.filter; render(); return }
   const act = e.target.closest('[data-act]')?.dataset.act
   if (act === 'refresh') { await load(); toast('Updated'); return }

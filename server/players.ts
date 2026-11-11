@@ -14,7 +14,7 @@ export type PlayerRow = {
   streak: number; best_streak: number; last_play_day: string | null; last_bonus_day: string | null; chest_day: string | null
   pro_hint_day: string | null; last_reward_ad: number; reward_ads_day: string | null; reward_ads_count: number
   fumbua_dist: number[]; pangua_level: number; duel_wins: number; duel_played: number
-  recovery_code: string; created_at: number; last_seen: number
+  recovery_code: string; created_at: number; last_seen: number; name_key: string | null; pass_hash: string | null
 }
 
 export async function getPlayer(id: number, db: Db = sql) {
@@ -40,11 +40,11 @@ function recoveryCode() {
   return `UBG-${part()}-${part()}`
 }
 
-export async function createPlayer(name: string, avatar: string, region: string) {
+export async function createPlayer(name: string, avatar: string, region: string, nameKey: string, passHash: string) {
   const now = Date.now()
   const [p] = await sql<PlayerRow[]>`
-    INSERT INTO players (name, avatar, region, coins, gems, inv, recovery_code, created_at, last_seen)
-    VALUES (${name}, ${avatar}, ${region}, ${STARTER.coins}, ${STARTER.gems}, ${sql.json(STARTER.inv)}, ${recoveryCode()}, ${now}, ${now})
+    INSERT INTO players (name, name_key, pass_hash, avatar, region, coins, gems, inv, recovery_code, created_at, last_seen)
+    VALUES (${name}, ${nameKey}, ${passHash}, ${avatar}, ${region}, ${STARTER.coins}, ${STARTER.gems}, ${sql.json(STARTER.inv)}, ${recoveryCode()}, ${now}, ${now})
     RETURNING *`
   return p
 }
@@ -131,7 +131,7 @@ export async function serialize(p: PlayerRow) {
     lastBonusDay: p.last_bonus_day, chestDay: p.chest_day, lastRewardAd: p.last_reward_ad,
     fumbuaDist: p.fumbua_dist, panguaLevel: p.pangua_level,
     duelWins: p.duel_wins, duelPlayed: p.duel_played,
-    recoveryCode: p.recovery_code,
+    recoveryCode: p.recovery_code, hasPassword: !!p.pass_hash,
     daily, stats, weekly: w.s, today, dayIndex: dayIndex(), week: weekKey(),
   }
 }

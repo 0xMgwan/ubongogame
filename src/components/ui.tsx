@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useSpring, useTransform } from 'framer-motion'
 import { ReactNode, useEffect, useRef, useState } from 'react'
-import { GAMES, GameId, Me, Sponsor, levelFromXp, useStore } from '../lib/store'
+import { GAMES, GameId, Me, Sponsor, THEMES, levelFromXp, useStore } from '../lib/store'
 import { HOUSE, Tab, useNav } from '../lib/nav'
 import { api } from '../lib/api'
 import { sfx } from '../lib/sound'
@@ -49,7 +49,42 @@ export function TopBar() {
         <span className="lvl">{levelFromXp(s.xp)}</span>
       </button>
       <div className="grow" />
+      <ThemeToggle />
       <Wallet />
+    </div>
+  )
+}
+
+const DARK = new Set(['usiku', 'dhahabu'])
+export const isDarkTheme = (t: string) => DARK.has(t)
+/** Sun/moon switch in the top bar: flips between the light and dark paper themes. */
+export function ThemeToggle() {
+  const { theme, updateMe } = useStore()
+  const dark = isDarkTheme(theme)
+  return (
+    <motion.button whileTap={{ scale: .85, rotate: 20 }} className="pill" style={{ width: 36, padding: 0, justifyContent: 'center' }}
+      aria-label={dark ? 'Mandhari ya mchana' : 'Mandhari ya usiku'} title={dark ? 'Mchana' : 'Usiku'}
+      onClick={() => { sfx.tap(); updateMe({ theme: dark ? 'karatasi' : 'usiku' }) }}>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.span key={dark ? 'm' : 's'} initial={{ rotate: -90, scale: 0 }} animate={{ rotate: 0, scale: 1 }} exit={{ rotate: 90, scale: 0 }} transition={{ duration: .2 }} style={{ display: 'inline-flex' }}>
+          <Icon name={dark ? 'moon' : 'sun'} size={20} fill={dark ? THEMES.usiku.accent : '#f5b800'} />
+        </motion.span>
+      </AnimatePresence>
+    </motion.button>
+  )
+}
+
+/** Password input with show/hide. */
+export function PasswordField({ value, onChange, placeholder = 'Nenosiri', autoComplete = 'current-password', onEnter }: { value: string; onChange: (v: string) => void; placeholder?: string; autoComplete?: string; onEnter?: () => void }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div style={{ position: 'relative' }}>
+      <input className="field" type={show ? 'text' : 'password'} placeholder={placeholder} value={value} autoComplete={autoComplete} maxLength={128}
+        onChange={e => onChange(e.target.value)} onKeyDown={e => e.key === 'Enter' && onEnter?.()} style={{ paddingRight: 52 }} />
+      <button type="button" onClick={() => setShow(v => !v)} aria-label={show ? 'Ficha nenosiri' : 'Onyesha nenosiri'}
+        style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 38, height: 38, display: 'grid', placeItems: 'center', opacity: show ? 1 : .6 }}>
+        <Icon name={show ? 'eye' : 'lock'} size={20} />
+      </button>
     </div>
   )
 }

@@ -4,7 +4,8 @@ import { AVATARS, GAMES, GameId, Me, REGIONS, THEMES, ThemeId, levelFromXp, titl
 import { useNav } from '../lib/nav'
 import { api } from '../lib/api'
 import { setHaptics, setSound, sfx } from '../lib/sound'
-import { Avatar, Sheet, TopBar, spring } from '../components/ui'
+import { Avatar, PasswordField, Sheet, TopBar, spring } from '../components/ui'
+import { InstallGuide, isStandalone } from '../components/install'
 import { ANIMAL_NAMES, AnimalArt, GameMark, Icon, IconName } from '../components/icons'
 
 export default function Profile() {
@@ -14,6 +15,18 @@ export default function Profile() {
   const [name, setName] = useState(s.name)
   const [restore, setRestore] = useState(false)
   const [code, setCode] = useState('')
+  const [pwOpen, setPwOpen] = useState(false)
+  const [cur, setCur] = useState('')
+  const [npw, setNpw] = useState('')
+  const [pwBusy, setPwBusy] = useState(false)
+  const [install, setInstall] = useState(false)
+  const savePassword = async () => {
+    setPwBusy(true)
+    try {
+      const r = await api<{ me: Me }>('/me/password', { body: { current: cur, password: npw } })
+      s.applyMe(r.me); setCur(''); setNpw(''); setPwOpen(false); sfx.good(); s.notify('Nenosiri limebadilishwa', 'lock')
+    } catch (e) { sfx.bad(); s.fail(e) } finally { setPwBusy(false) }
+  }
   const lvl = levelFromXp(s.xp)
   const lo = xpForLevel(lvl), hi = xpForLevel(lvl + 1)
   const totalWins = Object.values(s.stats).reduce((a, x) => a + x.won, 0)
@@ -28,7 +41,7 @@ export default function Profile() {
     { icon: 'chest', name: 'Bingwa wa Mafumbo', got: s.stats.mafumbo.won >= 5, color: '#ff9fb6' },
   ]
   const maxDist = Math.max(1, ...s.fumbuaDist)
-  const saveName = () => { const n = name.trim(); if (n.length >= 2 && n !== s.name) s.updateMe({ name: n }); else setName(s.name) }
+  const saveName = async () => { const n = name.trim(); if (n.length >= 3 && n !== s.name) await s.updateMe({ name: n }); setName(useStore.getState().name) }
   const doRestore = async () => {
     try {
       const r = await api<{ token: string; me: Me }>('/auth/restore', { body: { code } })
@@ -121,6 +134,13 @@ export default function Profile() {
           <Toggle icon="phone" label="Mtetemo" on={s.haptics} set={v => { s.set({ haptics: v }); setHaptics(v) }} />
         </div>
 
+        {!isStandalone() && (
+          <motion.button whileTap={{ scale: .98 }} className="card" onClick={() => setInstall(true)} style={{ width: '100%', marginTop: 14, display: 'flex', gap: 12, alignItems: 'center', textAlign: 'left' }}>
+            <img src="/icon-192.png" alt="" width={40} height={40} style={{ borderRadius: 11, border: '2px solid var(--edge)' }} />
+            <div className="grow"><div style={{ fontWeight: 900 }}>Weka Ubongo kwenye simu</div><div className="mute" style={{ fontSize: 12.5, fontWeight: 700 }}>Ifungue kama app, skrini nzima</div></div>
+            <Icon name="download" size={20} fill="var(--gold)" />
+          </motion.button>
+        )}
         <motion.button whileTap={{ scale: .98 }} className="card" onClick={() => openAd(true)} style={{ width: '100%', marginTop: 14, display: 'flex', gap: 12, alignItems: 'center', textAlign: 'left', background: 'var(--gold)', color: '#141414' }}>
           <Icon name="megaphone" size={36} fill="#fffdf8" />
           <div className="grow"><div className="display" style={{ fontSize: 24 }}>Tangaza na Ubongo</div><div style={{ fontSize: 12.5, fontWeight: 700 }}>Weka biashara yako mbele ya wachezaji</div></div>
@@ -128,6 +148,24 @@ export default function Profile() {
         </motion.button>
 
         <div className="h-sec"><h2>Akaunti</h2></div>
+        <div className="card" style={{ marginBottom: 14 }}>
+          <button className="row" style={{ width: '100%' }} onClick={() => setPwOpen(v => !v)}>
+            <Icon name="lock" size={22} />
+            <span className="grow" style={{ textAlign: 'left' }}>
+              <b style={{ display: 'block' }}>{s.hasPassword ? 'Badilisha nenosiri' : 'Weka nenosiri'}</b>
+              <span className="mute" style={{ fontSize: 12, fontWeight: 700 }}>{s.hasPassword ? 'Unaingia kwa jina lako na nenosiri' : 'Ili uingie kwa jina lako kwenye simu nyingine'}</span>
+            </span>
+            <motion.span animate={{ rotate: pwOpen ? 90 : 0 }}><Icon name="next" size={18} /></motion.span>
+          </button>
+          {pwOpen && (
+            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+              {s.hasPassword && <PasswordField value={cur} onChange={setCur} placeholder="Nenosiri la sasa" />}
+              <PasswordField value={npw} onChange={setNpw} placeholder="Nenosiri jipya (angalau 6)" autoComplete="new-password" onEnter={savePassword} />
+              <button className="btn ink block" disabled={pwBusy || npw.length < 6 || (s.hasPassword && !cur)} onClick={savePassword}>{pwBusy ? 'Inahifadhi…' : 'Hifadhi nenosiri'}</button>
+              {s.hasPassword && <p className="mute" style={{ fontSize: 12, fontWeight: 700, margin: 0 }}>Umesahau la sasa? Toka, kisha tumia “Umesahau nenosiri?” pamoja na msimbo wa kurejesha hapa chini.</p>}
+            </motion.div>
+          )}
+        </div>
         <div className="ticket" style={{ background: 'var(--paper)', color: 'var(--ink)' }}>
           <div className="t-side">KUREJESHA</div>
           <div className="t-body">
@@ -151,6 +189,7 @@ export default function Profile() {
           onClick={() => { if (confirm('Toka kwenye akaunti hii? Utahitaji msimbo wa kurejesha kurudi.')) s.signOut() }}><Icon name="logout" size={16} /> Toka</button>
       </div>
 
+      <InstallGuide open={install} onClose={() => setInstall(false)} />
       <Sheet open={pickAvatar} onClose={() => setPickAvatar(false)}>
         <h3 className="display" style={{ fontSize: 32, marginBottom: 14 }}>Chagua mnyama wako</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>

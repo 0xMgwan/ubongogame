@@ -21,7 +21,7 @@ export type Me = {
   theme: ThemeId; frame: FrameId; ownedThemes: ThemeId[]; ownedFrames: FrameId[]
   streak: number; bestStreak: number; lastPlayDay: string | null
   lastBonusDay: string | null; chestDay: string | null; lastRewardAd: number
-  fumbuaDist: number[]; panguaLevel: number; recoveryCode: string; duelWins: number; duelPlayed: number
+  fumbuaDist: number[]; panguaLevel: number; recoveryCode: string; duelWins: number; duelPlayed: number; hasPassword: boolean
   daily: Record<string, Partial<Record<GameId, number>>>
   stats: Record<GameId, { played: number; won: number; best: number }>
   weekly: number; today: string; dayIndex: number; week: string
@@ -32,7 +32,7 @@ const BLANK: Me = {
   id: 0, name: 'Mchezaji', avatar: 'simba', region: 'Dar es Salaam', coins: 0, gems: 0, xp: 0, pro: false, proUntil: 0,
   inv: { dokezo: 0, muda: 0, kinga: 0, bomu: 0 }, theme: 'karatasi', frame: 'none', ownedThemes: ['karatasi', 'usiku'], ownedFrames: ['none'],
   streak: 0, bestStreak: 0, lastPlayDay: null, lastBonusDay: null, chestDay: null, lastRewardAd: 0,
-  fumbuaDist: [0, 0, 0, 0, 0, 0, 0], panguaLevel: 1, recoveryCode: '', duelWins: 0, duelPlayed: 0, daily: {},
+  fumbuaDist: [0, 0, 0, 0, 0, 0, 0], panguaLevel: 1, recoveryCode: '', duelWins: 0, duelPlayed: 0, hasPassword: false, daily: {},
   stats: { fumbua: { played: 0, won: 0, best: 0 }, mafumbo: { played: 0, won: 0, best: 0 }, windo: { played: 0, won: 0, best: 0 }, pangua: { played: 0, won: 0, best: 0 } },
   weekly: 0, today: '', dayIndex: 0, week: '',
 }

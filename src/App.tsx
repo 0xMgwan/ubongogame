@@ -1,10 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { CSSProperties, useEffect, useState } from 'react'
+import { CSSProperties, useEffect, useRef, useState } from 'react'
 import { AVATARS, Me, REGIONS, THEMES, ThemeId, useStore } from './lib/store'
 import { useNav } from './lib/nav'
 import { api } from './lib/api'
 import { sfx } from './lib/sound'
-import { BottomNav, Toast, spring } from './components/ui'
+import { BottomNav, PasswordField, Toast, spring } from './components/ui'
+import { InstallGuide, shouldAutoShowInstall } from './components/install'
 import { ANIMAL_NAMES, AnimalArt, GameMark, Icon } from './components/icons'
 import Home from './screens/Home'
 import Vita from './screens/Vita'
@@ -108,88 +109,156 @@ function Offline() {
   )
 }
 
+type Mode = 'new' | 'login' | 'forgot' | 'code'
+const slide = { initial: { x: 40, opacity: 0 }, animate: { x: 0, opacity: 1 }, exit: { x: -40, opacity: 0 } }
+
 function Onboard({ invited }: { invited: boolean }) {
   const s = useStore()
+  const [mode, setMode] = useState<Mode>('new')
   const [step, setStep] = useState(0)
   const [name, setName] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [restore, setRestore] = useState(false)
+  const [pw, setPw] = useState('')
   const [code, setCode] = useState('')
-  const next = () => { sfx.tap(); setStep(x => x + 1) }
-  const finish = async (token: string, me: Me) => {
+  const [busy, setBusy] = useState(false)
+  const [nameState, setNameState] = useState<{ checking: boolean; ok: boolean | null; msg: string }>({ checking: false, ok: null, msg: '' })
+  const [showInstall, setShowInstall] = useState(false)
+
+  // live "is this name free?" check while typing (new accounts only)
+  useEffect(() => {
+    if (mode !== 'new') return
+    const n = name.trim()
+    if (n.length < 3) { setNameState({ checking: false, ok: null, msg: n ? 'Angalau herufi 3' : '' }); return }
+    setNameState(x => ({ ...x, checking: true }))
+    const t = setTimeout(() => {
+      api<{ valid: boolean; available: boolean; error?: string }>('/auth/name?name=' + encodeURIComponent(n))
+        .then(r => setNameState({ checking: false, ok: r.valid && r.available, msg: !r.valid ? r.error ?? 'Jina si sahihi' : r.available ? 'Jina liko wazi!' : 'Limeshachukuliwa — jaribu jingine' }))
+        .catch(() => setNameState({ checking: false, ok: null, msg: '' }))
+    }, 350)
+    return () => clearTimeout(t)
+  }, [name, mode])
+
+  const finish = async (token: string, me: Me, isNew: boolean) => {
     sfx.win(); s.signIn(token, me)
-    // match the phone's dark mode on first launch
-    if (window.matchMedia?.('(prefers-color-scheme: dark)').matches && me.theme === 'karatasi') s.updateMe({ theme: 'usiku' })
+    if (window.matchMedia?.('(prefers-color-scheme: dark)').matches && me.theme === 'karatasi' && isNew) s.updateMe({ theme: 'usiku' })
   }
-  const create = async () => {
-    setBusy(true)
-    try { const r = await api<{ token: string; me: Me }>('/auth/guest', { body: { name: s.name, avatar: s.avatar, region: s.region } }); await finish(r.token, r.me) }
-    catch (e) { s.fail(e) } finally { setBusy(false) }
-  }
-  const doRestore = async () => {
-    setBusy(true)
-    try { const r = await api<{ token: string; me: Me }>('/auth/restore', { body: { code } }); await finish(r.token, r.me); s.notify(`Karibu tena, ${r.me.name}!`, 'key') }
-    catch (e) { s.fail(e) } finally { setBusy(false) }
-  }
-  const slide = { initial: { x: 40, opacity: 0 }, animate: { x: 0, opacity: 1 }, exit: { x: -40, opacity: 0 } }
+  const run = async (fn: () => Promise<void>) => { setBusy(true); try { await fn() } catch (e) { sfx.bad(); s.fail(e) } finally { setBusy(false) } }
+  const register = () => run(async () => {
+    const r = await api<{ token: string; me: Me }>('/auth/register', { body: { name: name.trim(), password: pw, avatar: s.avatar, region: s.region } })
+    if (shouldAutoShowInstall()) { useStore.setState({ ...r.me }); setShowInstall(true); pendingFinish.current = () => finish(r.token, r.me, true) }
+    else await finish(r.token, r.me, true)
+  })
+  const login = () => run(async () => {
+    const r = await api<{ token: string; me: Me }>('/auth/login', { body: { name, password: pw } })
+    await finish(r.token, r.me, false); s.notify(`Karibu tena, ${r.me.name}!`, 'key')
+  })
+  const reset = () => run(async () => {
+    const r = await api<{ token: string; me: Me }>('/auth/reset', { body: { name, code, password: pw } })
+    await finish(r.token, r.me, false); s.notify('Nenosiri jipya limewekwa', 'lock')
+  })
+  const byCode = () => run(async () => {
+    const r = await api<{ token: string; me: Me }>('/auth/restore', { body: { code } })
+    await finish(r.token, r.me, false); s.notify(`Karibu tena, ${r.me.name}!`, 'key')
+  })
+  const pendingFinish = useRef<() => void>()
+  const go = (m: Mode) => { sfx.tap(); setMode(m); setPw('') }
+  const next = () => { sfx.tap(); setStep(x => x + 1) }
+  const pwOk = pw.length >= 6
+
   return (
-    <motion.div style={{ position: 'absolute', inset: 0, padding: '54px 20px 26px', display: 'flex', flexDirection: 'column' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <div className="row" style={{ gap: 6, marginBottom: 26 }}>
-        {[0, 1, 2].map(i => <motion.div key={i} animate={{ flex: i === step ? 3 : 1, background: i <= step ? 'var(--ink)' : 'var(--soft)' }} style={{ height: 8, borderRadius: 4, border: '2px solid var(--ink)' }} />)}
-      </div>
+    <motion.div style={{ position: 'absolute', inset: 0, padding: '54px 20px 26px', display: 'flex', flexDirection: 'column', overflowY: 'auto' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      {mode === 'new' ? (
+        <div className="row" style={{ gap: 6, marginBottom: 26 }}>
+          {[0, 1, 2].map(i => <motion.div key={i} animate={{ flex: i === step ? 3 : 1, background: i <= step ? 'var(--ink)' : 'var(--soft)' }} style={{ height: 8, borderRadius: 4, border: '2px solid var(--ink)' }} />)}
+        </div>
+      ) : (
+        <button className="icon-btn" style={{ marginBottom: 20 }} onClick={() => go(mode === 'login' ? 'new' : 'login')} aria-label="Rudi"><Icon name="back" size={20} /></button>
+      )}
       <AnimatePresence mode="wait">
-        {step === 0 && (
-          <motion.div key="0" {...slide} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {mode === 'new' && step === 0 && (
+          <motion.div key="n0" {...slide} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             {invited && <div className="chip gold" style={{ alignSelf: 'flex-start', marginBottom: 12 }}><Icon name="ticket" size={14} /> Umealikwa kwenye changamoto!</div>}
             <div className="row" style={{ gap: 6 }}>{(['fumbua', 'mafumbo', 'windo', 'pangua'] as const).map((g, i) => <motion.div key={g} initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1, rotate: (i - 1.5) * 4 }} transition={{ delay: i * .07 }}><GameMark game={g} size={50} /></motion.div>)}</div>
-            <h1 className="display" style={{ fontSize: 68, marginTop: 18 }}>Karibu <span className="hl">Ubongo.</span></h1>
-            <p style={{ fontWeight: 700, fontSize: 16 }}>Michezo 4 ya maneno. Vita live. Changamoto za WhatsApp. Tukuite nani?</p>
-            <input autoFocus className="field" placeholder="Jina lako la mchezo" value={name} maxLength={16} onChange={e => setName(e.target.value)} style={{ height: 60, fontSize: 20, marginTop: 8 }} />
-            <div className="grow" />
-            {restore ? (
-              <div style={{ marginBottom: 12 }}>
-                <input className="field" placeholder="UBG-XXXX-XXXX" value={code} onChange={e => setCode(e.target.value.toUpperCase())} style={{ height: 54, letterSpacing: '.05em' }} />
-                <button className="btn block" style={{ marginTop: 10 }} disabled={busy || code.length < 10} onClick={doRestore}><Icon name="key" size={18} /> {busy ? 'Inarejesha…' : 'Rejesha akaunti yangu'}</button>
-              </div>
-            ) : (
-              <button className="mute" style={{ fontWeight: 800, marginBottom: 14 }} onClick={() => setRestore(true)}>Nina msimbo wa kurejesha akaunti</button>
-            )}
-            <button className="btn ink block" disabled={name.trim().length < 2} onClick={() => { s.set({ name: name.trim() }); next() }}>Endelea <Icon name="next" size={18} /></button>
+            <h1 className="display" style={{ fontSize: 64, marginTop: 16 }}>Karibu <span className="hl">Ubongo.</span></h1>
+            <p style={{ fontWeight: 700, fontSize: 15.5, margin: '6px 0 12px' }}>Chagua jina lako la mchezo — ni lako peke yako — na nenosiri.</p>
+            <div style={{ position: 'relative' }}>
+              <input autoFocus className="field" placeholder="Jina la mchezo" value={name} maxLength={16} autoComplete="username" onChange={e => setName(e.target.value)} style={{ height: 58, fontSize: 19, paddingRight: 48 }} />
+              <span style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: nameState.ok ? 'var(--green)' : 'var(--red)' }}>
+                {nameState.checking ? <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} style={{ display: 'inline-flex', color: 'var(--mute)' }}><Icon name="refresh" size={20} /></motion.span>
+                  : nameState.ok === true ? <Icon name="check" size={22} /> : nameState.ok === false ? <Icon name="close" size={20} /> : null}
+              </span>
+            </div>
+            <div style={{ minHeight: 22, fontSize: 12.5, fontWeight: 800, margin: '6px 4px 8px', color: nameState.ok ? 'var(--green)' : nameState.ok === false ? 'var(--red)' : 'var(--mute)' }}>{nameState.msg}</div>
+            <PasswordField value={pw} onChange={setPw} placeholder="Nenosiri (angalau herufi 6)" autoComplete="new-password" />
+            <div className="grow" style={{ minHeight: 20 }} />
+            <button className="btn ink block" disabled={!nameState.ok || !pwOk} onClick={next}>Endelea <Icon name="next" size={18} /></button>
+            <button className="btn block" style={{ marginTop: 10 }} onClick={() => go('login')}><Icon name="key" size={18} /> Nina akaunti — Ingia</button>
           </motion.div>
         )}
-        {step === 1 && (
-          <motion.div key="1" {...slide} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {mode === 'new' && step === 1 && (
+          <motion.div key="n1" {...slide} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             <h1 className="display" style={{ fontSize: 50 }}>Chagua <span className="hl">mnyama</span> wako.</h1>
             <p style={{ fontWeight: 700 }}>Atakuwakilisha kwenye Ligi na Vita.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginTop: 6 }}>
               {AVATARS.map((a, i) => (
                 <motion.button whileTap={{ scale: .85 }} key={a} onClick={() => { s.set({ avatar: a }); sfx.pop() }} animate={{ y: s.avatar === a ? -4 : 0, rotate: s.avatar === a ? -6 : (i % 3 - 1) * 3 }}
                   style={{ textAlign: 'center', fontSize: 11, fontWeight: 800 }}>
-                  <div style={{ borderRadius: '50%', border: 'var(--line)', boxShadow: s.avatar === a ? '4px 4px 0 var(--ink)' : 'none', overflow: 'hidden', background: 'var(--paper)' }}><AnimalArt id={a} size={68} /></div>
+                  <div style={{ borderRadius: '50%', border: 'var(--line)', boxShadow: s.avatar === a ? '4px 4px 0 var(--edge)' : 'none', overflow: 'hidden', background: 'var(--paper)' }}><AnimalArt id={a} size={68} /></div>
                   <div style={{ marginTop: 3 }}>{ANIMAL_NAMES[a]}</div>
                 </motion.button>
               ))}
             </div>
-            <div className="grow" />
+            <div className="grow" style={{ minHeight: 20 }} />
             <button className="btn ink block" onClick={next}>Endelea <Icon name="next" size={18} /></button>
           </motion.div>
         )}
-        {step === 2 && (
-          <motion.div key="2" {...slide} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {mode === 'new' && step === 2 && (
+          <motion.div key="n2" {...slide} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             <h1 className="display" style={{ fontSize: 50 }}>Unacheza ukiwa <span className="hl red">wapi?</span></h1>
             <p style={{ fontWeight: 700 }}>Pigania mkoa wako kwenye Ligi ya Mikoa.</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
               {REGIONS.map(r => <button key={r} className={`chip ${s.region === r ? 'ink' : ''}`} onClick={() => { s.set({ region: r }); sfx.tap() }} style={{ fontSize: 14, padding: '9px 14px' }}>{r}</button>)}
             </div>
-            <div className="grow" />
+            <div className="grow" style={{ minHeight: 20 }} />
             <div className="ticket" style={{ marginBottom: 16 }}>
               <div className="t-side">ZAWADI</div>
               <div className="t-body"><b className="display" style={{ fontSize: 22 }}>Zawadi ya kukaribisha</b><div style={{ fontWeight: 800, fontSize: 13 }} className="row"><Icon name="coin" size={18} /> 250 · <Icon name="gem" size={18} /> 10 · <Icon name="bulb" size={18} /> 3 dokezo</div></div>
             </div>
-            <button className="btn gold block nudge" disabled={busy} onClick={create}>{busy ? 'Inaandaa…' : 'Tuanze!'} <Icon name="bolt" size={18} fill="#fffdf8" /></button>
+            <button className="btn gold block nudge" disabled={busy} onClick={register}>{busy ? 'Inaandaa…' : 'Tuanze!'} <Icon name="bolt" size={18} fill="#fffdf8" /></button>
+          </motion.div>
+        )}
+        {mode === 'login' && (
+          <motion.div key="login" {...slide} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <h1 className="display" style={{ fontSize: 58 }}>Karibu <span className="hl">tena.</span></h1>
+            <p style={{ fontWeight: 700, margin: '0 0 6px' }}>Ingia kwa jina lako la mchezo na nenosiri.</p>
+            <input className="field" placeholder="Jina la mchezo" value={name} autoComplete="username" onChange={e => setName(e.target.value)} style={{ height: 56, fontSize: 18 }} />
+            <PasswordField value={pw} onChange={setPw} onEnter={() => name && pw && login()} />
+            <button className="btn ink block" style={{ marginTop: 6 }} disabled={busy || !name.trim() || !pw} onClick={login}>{busy ? 'Inaingia…' : 'Ingia'} <Icon name="next" size={18} /></button>
+            <button className="mute" style={{ fontWeight: 800, marginTop: 8 }} onClick={() => go('forgot')}>Umesahau nenosiri?</button>
+            <div className="grow" />
+            <button className="btn block" onClick={() => go('code')}><Icon name="ticket" size={18} /> Ingia kwa msimbo wa kurejesha</button>
+          </motion.div>
+        )}
+        {mode === 'forgot' && (
+          <motion.div key="forgot" {...slide} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <h1 className="display" style={{ fontSize: 52 }}>Weka nenosiri <span className="hl red">jipya.</span></h1>
+            <p style={{ fontWeight: 700, margin: '0 0 6px' }}>Tumia jina lako na <b>msimbo wa kurejesha</b> (UBG-…) ulio kwenye wasifu wako.</p>
+            <input className="field" placeholder="Jina la mchezo" value={name} autoComplete="username" onChange={e => setName(e.target.value)} />
+            <input className="field" placeholder="UBG-XXXX-XXXX" value={code} onChange={e => setCode(e.target.value.toUpperCase())} style={{ letterSpacing: '.05em' }} />
+            <PasswordField value={pw} onChange={setPw} placeholder="Nenosiri jipya (angalau 6)" autoComplete="new-password" />
+            <button className="btn gold block" style={{ marginTop: 6 }} disabled={busy || !name.trim() || code.length < 10 || !pwOk} onClick={reset}>{busy ? 'Inabadilisha…' : 'Badilisha na uingie'}</button>
+            <p className="mute" style={{ fontSize: 12.5, fontWeight: 700 }}>Huna msimbo? Wasiliana na Ubongo — tunaweza kukuwekea nenosiri la muda.</p>
+          </motion.div>
+        )}
+        {mode === 'code' && (
+          <motion.div key="code" {...slide} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <h1 className="display" style={{ fontSize: 52 }}>Msimbo wa <span className="hl">kurejesha.</span></h1>
+            <p style={{ fontWeight: 700, margin: '0 0 6px' }}>Ingiza msimbo wako (UBG-XXXX-XXXX) urudishe akaunti yako yote.</p>
+            <input className="field" placeholder="UBG-XXXX-XXXX" value={code} onChange={e => setCode(e.target.value.toUpperCase())} style={{ height: 56, fontSize: 18, letterSpacing: '.05em' }} />
+            <button className="btn ink block" style={{ marginTop: 6 }} disabled={busy || code.length < 10} onClick={byCode}>{busy ? 'Inarejesha…' : 'Rejesha akaunti'}</button>
           </motion.div>
         )}
       </AnimatePresence>
+      <InstallGuide open={showInstall} onClose={() => { setShowInstall(false); pendingFinish.current?.() }} />
     </motion.div>
   )
 }

@@ -1,0 +1,19 @@
+{
+  "name": "Ubongo — Michezo ya Maneno",
+  "short_name": "Ubongo",
+  "description": "Michezo 4 ya maneno ya Kiswahili, vita live na changamoto za marafiki.",
+  "lang": "sw",
+  "start_url": "/?source=homescreen",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f1e6",
+  "theme_color": "#f5b800",
+  "categories": ["games", "education", "entertainment"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
